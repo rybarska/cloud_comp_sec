@@ -1,0 +1,12 @@
+---
+- name: Step 1 - Make IP forwarding permanent via sysctl
+  hosts: aws-vpn
+  become: yes
+  tasks:
+    - name: Set net.ipv4.ip_forward to 1
+      ansible.builtin.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_file: /etc/sysctl.d/99-ip-forward.conf
+        state: present
+        reload: yes

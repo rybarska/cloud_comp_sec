@@ -1,0 +1,20 @@
+---
+- name: Verify Ansible Connectivity and Make a Visible Change
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Create a visible status file on both servers using raw
+      ansible.builtin.raw: |
+        echo "Hello from Ansible!" > /home/ubuntu/ansible_status.txt
+        echo "This file was automatically generated and deployed." >> /home/ubuntu/ansible_status.txt
+        echo "Target Node: {{ inventory_hostname }}"
+        chmod 0644 /home/ubuntu/ansible_status.txt
+
+    - name: Read the file back to prove it worked
+      ansible.builtin.raw: cat /home/ubuntu/ansible_status.txt
+      register: file_output
+      changed_when: false
+
+    - name: Print the file contents to your terminal screen
+      ansible.builtin.debug:
+        msg: '{{ file_output.stdout_lines }}'

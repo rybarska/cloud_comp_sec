@@ -1,0 +1,9 @@
+# Ignore private keys and certificates
+*.pem
+*.key
+*.crt
+
+# Ignore local inventory files containing real IPs/credentials
+hosts.yaml
+.DS_Store
+*.pub
