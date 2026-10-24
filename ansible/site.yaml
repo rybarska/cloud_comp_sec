@@ -60,3 +60,138 @@
     - name: Step 5 - Save iptables rules permanently to disk
       ansible.builtin.command: netfilter-persistent save
       changed_when: false
+
+- name: Configure AWS Web Server and Deploy Flask Application
+  hosts: webserver
+  become: yes
+  vars_files:
+    - vars/secrets.yml
+  tasks:
+    - name: Step 1 - Update apt and install Nginx, MySQL client, Flask, and PyMySQL
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - default-mysql-client
+          - python3-flask
+          - python3-pymysql
+        state: present
+        update_cache: yes
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Step 2 - Ensure Nginx is enabled and started
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Step 3 - Create cloud-webapp directory
+      ansible.builtin.file:
+        path: /home/ubuntu/cloud-webapp
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Step 4 - Deploy Flask application script (app.py using Vault secret)
+      ansible.builtin.copy:
+        dest: /home/ubuntu/cloud-webapp/app.py
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+        content: |
+          import pymysql
+          from flask import Flask, render_template_string
+
+          app = Flask(__name__)
+
+          @app.route("/")
+          def products():
+              connection = pymysql.connect(
+                  host="10.0.2.37",
+                  user="webuser",
+                  password="{{ db_password }}",
+                  database="cloudproject",
+                  cursorclass=pymysql.cursors.DictCursor
+              )
+              try:
+                  with connection.cursor() as cursor:
+                      cursor.execute("SELECT id, name, price FROM products")
+                      products = cursor.fetchall()
+              finally:
+                  connection.close()
+
+              return render_template_string("""
+          {% raw %}
+              <h1>Products from Oracle Database</h1>
+              <p>Data retrieved from OCI through the AWS-Oracle VPN.</p>
+              <table border="1" cellpadding="10">
+                  <tr>
+                      <th>ID</th>
+                      <th>Product</th>
+                      <th>Price</th>
+                  </tr>
+                  {% for product in products %}
+                  <tr>
+                      <td>{{ product.id }}</td>
+                      <td>{{ product.name }}</td>
+                      <td>{{ product.price }}</td>
+                  </tr>
+                  {% endfor %}
+              </table>
+          {% endraw %}
+              """, products=products)
+
+    - name: Step 5 - Configure Nginx reverse proxy to forward traffic to Flask (port 5000)
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+
+              root /var/www/html;
+              index index.html index.htm index.nginx-debian.html;
+
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          }
+      notify: Reload Nginx
+
+    - name: Step 6 - Create a clean systemd service for Flask app
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cloud-webapp.service
+        content: |
+          [Unit]
+          Description=Flask Cloud Web Application
+          After=network.target
+
+          [Service]
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/cloud-webapp
+          ExecStart=/usr/bin/python3 -m flask --app app run --host 127.0.0.1 --port 5000
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Step 7 - Kill any stray process on port 5000, reload daemon, and restart Flask
+      ansible.builtin.shell: |
+        fuser -k 5000/tcp || true
+        find /home/ubuntu/cloud-webapp -type d -name __pycache__ -exec rm -r {} +
+        systemctl daemon-reload
+        systemctl restart cloud-webapp
+      args:
+        executable: /bin/bash
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
