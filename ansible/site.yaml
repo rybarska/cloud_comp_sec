@@ -1,4 +1,24 @@
 ---
+- name: Step 0 - Establish Site-to-Site VPN Tunnel via strongSwan
+  hosts: oracle-vpn, aws-vpn
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Load all strongSwan configurations on both VPN gateways
+      ansible.builtin.raw: swanctl --load-all
+      changed_when: true
+
+- name: Step 0.1 - Initiate VPN connection from AWS VPN side
+  hosts: aws-vpn
+  gather_facts: no
+  become: yes
+  tasks:
+    - name: Initiate the cloud-network child association
+      ansible.builtin.raw: swanctl --initiate --child cloud-network
+      register: tunnel_result
+      changed_when: true
+      failed_when: false
+
 - name: Configure AWS VPN Gateway Forwarding and Firewall
   hosts: aws-vpn
   become: yes
