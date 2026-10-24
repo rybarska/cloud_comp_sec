@@ -1,9 +1,20 @@
-# Ignore private keys and certificates
+# Ignore private/public keys and certificates
 *.pem
 *.key
+*.pub
 *.crt
 
 # Ignore local inventory files containing real IPs/credentials
 hosts.yaml
+
+# Ignore local system/IDE files
 .DS_Store
-*.pub
+.idea/
+
+# Ignore local Ansible Vault password files
+.vault_pass
+.vault_password
+
+# Ignore any unencrypted or backup variable files just in case
+vars/secrets_unencrypted.yml
+*.bak
