@@ -61,7 +61,7 @@
       ansible.builtin.command: netfilter-persistent save
       changed_when: false
 
-- name: Configure AWS Web Server and Deploy Flask Application
+- name: Configure AWS Web Server, Flask Application, and ModSecurity WAF
   hosts: webserver
   become: yes
   vars_files:
@@ -142,29 +142,7 @@
           {% endraw %}
               """, products=products)
 
-    - name: Step 5 - Configure Nginx reverse proxy to forward traffic to Flask (port 5000)
-      ansible.builtin.copy:
-        dest: /etc/nginx/sites-available/default
-        content: |
-          server {
-              listen 80 default_server;
-              listen [::]:80 default_server;
-
-              root /var/www/html;
-              index index.html index.htm index.nginx-debian.html;
-
-              server_name _;
-
-              location / {
-                  proxy_pass http://127.0.0.1:5000;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              }
-          }
-      notify: Reload Nginx
-
-    - name: Step 6 - Create a clean systemd service for Flask app
+    - name: Step 5 - Create a clean systemd service for Flask app
       ansible.builtin.copy:
         dest: /etc/systemd/system/cloud-webapp.service
         content: |
@@ -181,7 +159,7 @@
           [Install]
           WantedBy=multi-user.target
 
-    - name: Step 7 - Kill any stray process on port 5000, reload daemon, and restart Flask
+    - name: Step 6 - Kill any stray process on port 5000, reload daemon, and restart Flask
       ansible.builtin.shell: |
         fuser -k 5000/tcp || true
         find /home/ubuntu/cloud-webapp -type d -name __pycache__ -exec rm -r {} +
@@ -189,6 +167,56 @@
         systemctl restart cloud-webapp
       args:
         executable: /bin/bash
+
+    - name: Step 7 - Install ModSecurity WAF and OWASP Core Rule Set
+      ansible.builtin.apt:
+        name:
+          - libnginx-mod-http-modsecurity
+          - modsecurity-crs
+        state: present
+        update_cache: yes
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Step 8 - Configure ModSecurity with explicit SQL injection blocking rules
+      ansible.builtin.copy:
+        dest: /etc/modsecurity/modsecurity.conf
+        content: |
+          SecRuleEngine On
+          SecRequestBodyAccess On
+          SecResponseBodyAccess On
+          SecResponseBodyMimeType text/plain text/html text/xml application/json
+          SecDataDir /var/lib/modsecurity
+
+          # Direct blocking rule for SQL injection payloads (Tautologies & OR operators)
+          SecRule QUERY_STRING "@rx (?i)(or|union|select|insert|update|delete|drop).*(=|['-])" \
+              "id:1001,phase:2,deny,status:403,msg:'SQL Injection Attack Blocked by WAF'"
+
+    - name: Step 9 - Configure Nginx reverse proxy with inline ModSecurity WAF
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+
+              root /var/www/html;
+              index index.html index.htm index.nginx-debian.html;
+
+              server_name _;
+
+              # Enable ModSecurity WAF inline
+              modsecurity on;
+              modsecurity_rules_file /etc/modsecurity/modsecurity.conf;
+
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          }
+      notify: Reload Nginx
 
   handlers:
     - name: Reload Nginx
