@@ -5,14 +5,14 @@ all:
         oracle-vpn:
           ansible_host: 138.2.139.105
           ansible_user: ubuntu
-          ansible_ssh_private_key_file: ~/.ssh-key-2026-10-15.key
+          ansible_ssh_private_key_file: ~/.ssh/oracle_key.pem
     provider_b:
       hosts:
         aws-vpn:
           ansible_host: 34.234.148.108
           ansible_user: ubuntu
-          ansible_ssh_private_key_file: ~/.provider-b-key.pem
+          ansible_ssh_private_key_file: ~/.ssh/aws_key.pem
         webserver:
           ansible_host: 10.20.1.195
           ansible_user: ubuntu
-          ansible_ssh_private_key_file: ~/.provider-b-key.pem
+          ansible_ssh_private_key_file: ~/.ssh/aws_key.pem
