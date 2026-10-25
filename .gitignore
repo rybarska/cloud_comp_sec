@@ -4,9 +4,6 @@
 *.pub
 *.crt
 
-# Ignore local inventory files containing real IPs/credentials
-hosts.yaml
-
 # Ignore local system/IDE files
 .DS_Store
 .idea/

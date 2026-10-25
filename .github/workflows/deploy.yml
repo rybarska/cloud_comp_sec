@@ -2,8 +2,8 @@ name: Deploy Multi-Cloud Infrastructure via Ansible
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: # Allows manual trigger from the GitHub web UI
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -23,25 +23,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install ansible pymysql
 
-      - name: Configure SSH Private Keys
+      - name: Configure SSH Private Keys and Clean Line Endings
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.ORACLE_SSH_PRIVATE_KEY }}" > 
-~/.ssh/oracle_key.pem
-          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/aws_key.pem
+          echo '${{ secrets.ORACLE_SSH_PRIVATE_KEY }}' | tr -d '\r' > ~/.ssh/oracle_key.pem
+          echo '${{ secrets.AWS_SSH_PRIVATE_KEY }}' | tr -d '\r' > ~/.ssh/aws_key.pem
           chmod 600 ~/.ssh/oracle_key.pem ~/.ssh/aws_key.pem
-          echo -e "Host *\n\tStrictHostKeyChecking no" > ~/.ssh/config
+          echo "Host *" > ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
 
       - name: Create Temporary Vault Password File
         run: |
-          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > 
-/tmp/vault_pass.txt
+          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' | tr -d '\r' > /tmp/vault_pass.txt
 
       - name: Run Ansible Playbook
         working-directory: ./ansible
         run: |
-          ansible-playbook -i hosts.yaml site.yaml --vault-password-file 
-/tmp/vault_pass.txt
+          ansible-playbook -i hosts.yaml site.yaml --vault-password-file /tmp/vault_pass.txt
 
       - name: Clean up Vault Password File
         if: always()
