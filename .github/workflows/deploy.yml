@@ -29,13 +29,13 @@ jobs:
           python3 -c "
           import os
 
-          oracle_key = '''${{ secrets.ORACLE_SSH_PRIVATE_KEY }}'''
+          oracle_key = '''${{ secrets.ORACLE_SSH_PRIVATE_KEY }}'''.replace('\r', '').strip() + '\n'
           with open(os.path.expanduser('~/.ssh/oracle_key.pem'), 'w') as f:
-              f.write(oracle_key.strip() + '\n')
+              f.write(oracle_key)
 
-          aws_key = '''${{ secrets.AWS_SSH_PRIVATE_KEY }}'''
+          aws_key = '''${{ secrets.AWS_SSH_PRIVATE_KEY }}'''.replace('\r', '').strip() + '\n'
           with open(os.path.expanduser('~/.ssh/aws_key.pem'), 'w') as f:
-              f.write(aws_key.strip() + '\n')
+              f.write(aws_key)
           "
           chmod 600 ~/.ssh/oracle_key.pem ~/.ssh/aws_key.pem
           echo "Host *" > ~/.ssh/config
