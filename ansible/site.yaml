@@ -93,13 +93,14 @@
         group: ubuntu
         mode: '0755'
 
-    - name: Step 4 - Deploy Flask application script (app.py using Vault secret)
+    - name: Step 4 - Deploy Flask application script (app.py reading from environment)
       ansible.builtin.copy:
         dest: /home/ubuntu/cloud-webapp/app.py
         owner: ubuntu
         group: ubuntu
         mode: '0644'
         content: |
+          import os
           import pymysql
           from flask import Flask, render_template_string
 
@@ -110,7 +111,7 @@
               connection = pymysql.connect(
                   host="10.0.2.37",
                   user="webuser",
-                  password="{{ db_password }}",
+                  password=os.environ.get("DB_PASSWORD", ""),
                   database="cloudproject",
                   cursorclass=pymysql.cursors.DictCursor
               )
@@ -142,28 +143,31 @@
           {% endraw %}
               """, products=products)
 
-    - name: Step 5 - Create a clean systemd service for Flask app
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/cloud-webapp.service
-        content: |
-          [Unit]
-          Description=Flask Cloud Web Application
-          After=network.target
+    - name: Step 5 - Create systemd service with securely injected DB password
+      ansible.builtin.shell: |
+        cat << 'EOF' > /etc/systemd/system/cloud-webapp.service
+        [Unit]
+        Description=Flask Cloud Web Application
+        After=network.target
 
-          [Service]
-          User=ubuntu
-          WorkingDirectory=/home/ubuntu/cloud-webapp
-          ExecStart=/usr/bin/python3 -m flask --app app run --host 127.0.0.1 --port 5000
-          Restart=always
+        [Service]
+        User=ubuntu
+        WorkingDirectory=/home/ubuntu/cloud-webapp
+        Environment=DB_PASSWORD={{ db_password }}
+        ExecStart=/usr/bin/python3 -m flask --app app run --host 127.0.0.1 --port 5000
+        Restart=always
 
-          [Install]
-          WantedBy=multi-user.target
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        systemctl daemon-reload
+      args:
+        executable: /bin/bash
 
-    - name: Step 6 - Kill any stray process on port 5000, reload daemon, and restart Flask
+    - name: Step 6 - Kill any stray process on port 5000, and restart Flask
       ansible.builtin.shell: |
         fuser -k 5000/tcp || true
         find /home/ubuntu/cloud-webapp -type d -name __pycache__ -exec rm -r {} +
-        systemctl daemon-reload
         systemctl restart cloud-webapp
       args:
         executable: /bin/bash
