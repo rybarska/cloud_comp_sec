@@ -1,0 +1,18 @@
+all:
+  children:
+    provider_a:
+      hosts:
+        oracle-vpn:
+          ansible_host: 138.2.139.105
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ./ssh-key-2026-10-15.key
+    provider_b:
+      hosts:
+        aws-vpn:
+          ansible_host: 34.234.148.108
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ./provider-b-key.pem
+        webserver:
+          ansible_host: 10.20.1.195
+          ansible_user: ubuntu
+          ansible_ssh_private_key_file: ./provider-b-key.pem
