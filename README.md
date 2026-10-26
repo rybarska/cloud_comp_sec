@@ -1,6 +1,6 @@
 Multi-Cloud Secure CI/CD Infrastructure (AWS & OCI)
 
-> **Course Context:** Developed as a practical lab exercise for the **Cloud Computing Security** course at **St. Pölten University of Applied Sciences (FH St. Pölten)**.
+> **Course Context:** Developed as a practical lab exercise for the **Cloud Computing Security** course at **St. Pölten University of Applied Sciences (USTP St. Pölten)**.
 
 This repository automates the deployment and security orchestration of a 
 multi-cloud lab environment linking Amazon Web Services (AWS) and Oracle Cloud 
